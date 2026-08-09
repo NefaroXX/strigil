@@ -48,7 +48,8 @@ assert_exit "--ignore-case matching" 0 "$BIN" THE "$TEST_FILE" --ignore-case
 assert_exit "--ignore-case before the positionals" 0 "$BIN" --ignore-case THE "$TEST_FILE"
 assert_exit "--ignore-case between the positionals" 0 "$BIN" THE --ignore-case "$TEST_FILE"
 assert_exit "missing file error" 3 "$BIN" fox "$TMP/does-not-exist.txt"
-assert_exit "wrong arg count" 2 "$BIN" fox
+assert_exit "wrong arg count" 2 "$BIN"
+assert_exit "too many positional arguments" 2 "$BIN" fox "$TEST_FILE" extra
 
 # COLOR=always must wrap the first match per line in ANSI red.
 OUT="$(COLOR=always "$BIN" fox "$TEST_FILE")"
@@ -59,6 +60,23 @@ else
     echo "FAIL: COLOR=always ANSI highlight"
     fail=$((fail + 1))
 fi
+
+# Standard input: with no file argument, strigil reads stdin.
+if printf '%s\n' 'The quick brown fox' 'jumps over the lazy dog' 'the end' | "$BIN" fox >/dev/null 2>&1; then
+    echo "PASS: reads standard input when no file is given (exit 0)"
+    pass=$((pass + 1))
+else
+    echo "FAIL: reading standard input"
+    fail=$((fail + 1))
+fi
+
+assert_exit "--help prints usage" 0 "$BIN" --help
+assert_exit "--version prints version" 0 "$BIN" --version
+
+BINARY_FILE="$TMP/binary.dat"
+printf 'hello\0world\n' > "$BINARY_FILE"
+assert_exit "binary file with a match" 0 "$BIN" hello "$BINARY_FILE"
+assert_exit "binary file without a match" 1 "$BIN" nope "$BINARY_FILE"
 
 echo "----"
 echo "$pass passed, $fail failed"
