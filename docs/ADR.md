@@ -5,8 +5,9 @@
 
 ## PURPOSE
 strigil is a minimal, dependency-free clone of `grep`. Given a literal pattern
-and a file path, it prints every line containing the pattern as
-`{line_number}:{line}`, exiting with a deterministic status code.
+and an optional file path, it prints every line containing the pattern as
+`{line_number}:{line}`, exiting with a deterministic status code. When no file
+is given (or the file argument is `-`), standard input is searched instead.
 
 ## STACK
 - Language: Rust, edition 2021; no external dependencies — the standard library
@@ -17,9 +18,10 @@ and a file path, it prints every line containing the pattern as
 
 ## ARCHITECTURE
 - Binary crate with a thin `main` and a small set of plain functions:
-  `Invocation::parse` (CLI), `run` (I/O + matching), `print_match` (rendering).
-  Boundary: `main -> run` (single call site).
-- `Invocation { pattern, file, ignore_case }` is the parsed-enough-to-run
+  `Invocation::parse` (CLI), `run` (I/O + matching), `run_binary` (raw-byte
+  search), `print_match` (rendering). Boundary: `main -> run` (single call site).
+- `Parsed::{Run(Invocation), Help, Version}` is the parse result; `Invocation
+  { pattern, file: Option<&str>, ignore_case }` is the parsed-enough-to-run
   description; everything else is derived inside `run`.
 - `run` returns `io::Result<SearchOutcome>` where
   `SearchOutcome::{MatchFound, NoMatch, EmptyFile}` maps to exit codes
@@ -41,7 +43,13 @@ and a file path, it prints every line containing the pattern as
   so the slice boundaries are validated against the original line with
   `is_char_boundary` before slicing; a non-boundary case falls back to plain
   output instead of panicking.
-- Exit codes are a contract: `0` match / empty file, `1` no match,
+- Input sources: a file argument opens `File`; otherwise `io::stdin().lock()`
+  is used. The first chunk is probed with `fill_buf` for a NUL byte — binary
+  input is searched as raw bytes with an overlapping window (`run_binary`) and
+  reported with a single "binary file matches" line, in the spirit of grep.
+- `--help` and `--version` short-circuit in `parse` before positional
+  validation, print to stdout, and exit `0`.
+- Exit codes are a contract: `0` match / empty input, `1` no match,
   `2` usage error, `3` I/O error. Documented in README and enforced by
   `verify.sh` and `tests/cli.rs`.
 
@@ -61,6 +69,13 @@ and a file path, it prints every line containing the pattern as
   as the third argument: a friendlier grammar (and prototype parity) wins
   over strict flag position, and the scan cost is negligible for a
   two-argument CLI.
+- Binary detection is a heuristic: a NUL byte in the first chunk classifies
+  the input as binary. This mirrors grep's own behaviour closely enough for a
+  tool of this size, and trades a rare false positive (valid UTF-8 containing
+  NULs) for never choking on arbitrary bytes.
+- The file argument is optional (stdin fallback) because streaming
+  compatibility is the cheapest way to compose with other tools (`ps aux |
+  strigil python`); `-` keeps the grammar explicit for scripts.
 
 ## PHILOSOPHY
 - Dependencies are the enemy. If a feature cannot be built with `std`, it does

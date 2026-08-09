@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Standard input: `strigil <pattern>` reads from stdin when no file is given,
+  and a `-` file argument also means stdin.
+- `--help` and `--version` flags, both printing to stdout and exiting `0`.
+- Binary input detection: when the first chunk of input contains a NUL byte,
+  strigil searches the raw bytes and prints a single "binary file matches"
+  line (exit `0` on a match, `1` otherwise).
+- CI now runs the full gate on Windows and macOS in addition to Linux.
+
 ### Changed
+- The `<file>` argument is now optional — it falls back to standard input.
 - `--ignore-case` is now accepted anywhere on the command line, not only as
   the third argument.
 - Usage errors now report the number of positional arguments that were given.
