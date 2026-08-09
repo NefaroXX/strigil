@@ -220,6 +220,57 @@ fn capital_v_flag_prints_the_version() {
 }
 
 #[test]
+fn count_flag_prints_only_the_number_of_matching_lines() {
+    let file = temp_file();
+    let out = run(&["the", file.to_str().unwrap(), "-c"]);
+    assert_eq!(exit_code(&out), 0);
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "2");
+}
+
+#[test]
+fn count_flag_combines_with_ignore_case() {
+    let file = temp_file();
+    let out = run(&["-i", "the", "-c", file.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 0);
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "3");
+}
+
+#[test]
+fn count_on_empty_input_prints_zero_and_exits_zero() {
+    let out = run_with_stdin(&["fox", "-c"], "");
+    assert_eq!(exit_code(&out), 0);
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "0");
+}
+
+#[test]
+fn invert_flag_prints_only_non_matching_lines() {
+    let file = temp_file();
+    let out = run(&["the", file.to_str().unwrap(), "-v"]);
+    assert_eq!(exit_code(&out), 0);
+    // Only line 1 ("The quick brown fox") lacks a lowercase "the".
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("1:The quick brown fox"));
+    assert!(!stdout.contains("2:"));
+    assert!(!stdout.contains("3:"));
+}
+
+#[test]
+fn invert_flag_exits_one_when_every_line_matches() {
+    let file = temp_file();
+    let out = run(&["e", file.to_str().unwrap(), "-v"]);
+    assert_eq!(exit_code(&out), 1);
+    assert!(out.stdout.is_empty());
+}
+
+#[test]
+fn count_and_invert_combine() {
+    let file = temp_file();
+    let out = run(&["-v", "-c", "e", file.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 1); // every line contains 'e', so none inverted
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "0");
+}
+
+#[test]
 fn binary_input_with_a_match_prints_binary_file_matches() {
     let path = std::env::temp_dir().join(format!("strigil_cli_test_{}.bin", std::process::id()));
     fs::write(&path, b"hello\x00world\n").expect("writes a binary temp file");

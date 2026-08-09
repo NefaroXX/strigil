@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `-i` and `-V` short flags, aliasing `--ignore-case` and `--version`
   respectively (grep-style); accepted anywhere alongside the long forms.
+- `-c` / `--count` prints only the number of matching lines, and
+  `-v` / `--invert-match` prints only the lines that do NOT contain the
+  pattern; both combine with `-i` and with each other.
 - Standard input: `strigil <pattern>` reads from stdin when no file is given,
   and a `-` file argument also means stdin.
 - `--help` and `--version` flags, both printing to stdout and exiting `0`.

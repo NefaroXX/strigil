@@ -26,7 +26,7 @@ $ strigil the README.md
 ## Features
 
 - **Manual CLI parsing** — no clap, no derive macros:
-  `strigil <pattern> [<file>] [-i] [-V] [--help] [--version]`.
+  `strigil <pattern> [<file>] [options]`.
 - **Standard input** — omit the file (or pass `-`) to search stdin, so it
   composes in pipelines.
 - **`--help` and `--version`** — informational flags that exit `0`.
@@ -37,6 +37,10 @@ $ strigil the README.md
 - **`-i, --ignore-case`** — folds both the pattern and each line to lowercase
   before matching. The flag is accepted anywhere on the command line —
   before, between, or after the two positional arguments.
+- **`-c, --count`** — print only the number of matching lines instead of the
+  lines themselves.
+- **`-v, --invert-match`** — print only the lines that do NOT contain the
+  pattern.
 - **ANSI highlighting** — set `COLOR=always` and the first match on each line
   is wrapped in red (`\x1b[31m...\x1b[0m`).
 - **Predictable exit codes** — `0` match, `1` no match, `2` usage error,
@@ -68,7 +72,7 @@ cargo build --release
 ## Usage
 
 ```bash
-strigil <pattern> [<file>] [-i] [-V] [--help] [--version]
+strigil <pattern> [<file>] [-i] [-c] [-v] [-V] [--help]
 ```
 
 | Argument | Description |
@@ -78,9 +82,11 @@ strigil <pattern> [<file>] [-i] [-V] [--help] [--version]
 | `-i, --ignore-case` | Match case-insensitively (accepted in any position). |
 | `--help` | Print usage and exit `0`. |
 | `-V, --version` | Print the version and exit `0`. |
+| `-c, --count` | Print only the number of matching lines. |
+| `-v, --invert-match` | Print only lines that do NOT contain the pattern. |
 
-> **Note:** matching is case-sensitive by default. Short flags `-i` and `-V`
-> work exactly like their long counterparts.
+> **Note:** matching is case-sensitive by default. Short flags `-i`, `-c`,
+> `-v`, and `-V` work exactly like their long counterparts.
 
 ### Examples
 
@@ -97,6 +103,12 @@ strigil --ignore-case ERROR server.log
 
 # Highlight matches in red (single match per line only)
 COLOR=always strigil TODO src/main.rs
+
+# Count matching lines
+strigil -c ERROR server.log
+
+# Invert — every line NOT containing the pattern
+strigil -v "DEBUG" server.log
 
 # Search standard input — no file argument, or `-`
 ps aux | strigil python
@@ -119,8 +131,9 @@ the file with `std::fs::File` — or locks standard input when no file is given
 — wraps it in `std::io::BufReader`, and iterates `lines()` one at a time. For each line it searches for the pattern with a
 substring `find()`; when `--ignore-case` is given, both sides are folded to
 lowercase first. On a match it prints `{line_number}:{line}` — with the first
-occurrence wrapped in ANSI red when `COLOR=always` is set. Errors bubble up
-with the `?` operator and are mapped to the exit codes above.
+occurrence wrapped in ANSI red when `COLOR=always` is set. `-v` flips the
+test so non-matching lines are printed, and `-c` prints just the count.
+Errors bubble up with the `?` operator and are mapped to the exit codes above.
 
 There is no regex engine, no glob handling, and no memory beyond one line at a
 time (binary input is the exception: a small overlapping window is kept while

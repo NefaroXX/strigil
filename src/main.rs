@@ -33,23 +33,29 @@ struct Invocation<'a> {
     pattern: &'a str,
     file: Option<&'a str>,
     ignore_case: bool,
+    invert_match: bool,
+    count: bool,
 }
 
 impl<'a> Invocation<'a> {
     /// Parses the CLI arguments. The pattern is required; the file is
     /// optional and falls back to standard input (a literal `-` also names
-    /// standard input). `--ignore-case` (or `-i`) is accepted in any
-    /// position, and `--help` / `--version` (or `-V`) short-circuit to
-    /// informational output.
+    /// standard input). `-i`, `-c`, and `-v` (with their long forms) are
+    /// accepted in any position, and `--help` / `--version` (or `-V`)
+    /// short-circuit to informational output.
     fn parse(args: &'a [String]) -> Result<Parsed<'a>, String> {
         let mut positional: Vec<&'a str> = Vec::new();
         let mut ignore_case = false;
+        let mut invert_match = false;
+        let mut count = false;
         let mut help = false;
         let mut version = false;
 
         for arg in args {
             match arg.as_str() {
                 "--ignore-case" | "-i" => ignore_case = true,
+                "--invert-match" | "-v" => invert_match = true,
+                "--count" | "-c" => count = true,
                 "--help" => help = true,
                 "--version" | "-V" => version = true,
                 other => positional.push(other),
@@ -68,6 +74,8 @@ impl<'a> Invocation<'a> {
                 pattern,
                 file: None,
                 ignore_case,
+                invert_match,
+                count,
             })),
             [pattern, file] => {
                 let file = if *file == "-" { None } else { Some(*file) };
@@ -75,6 +83,8 @@ impl<'a> Invocation<'a> {
                     pattern,
                     file,
                     ignore_case,
+                    invert_match,
+                    count,
                 }))
             }
             _ => Err(format!(
@@ -127,9 +137,11 @@ Arguments:
   <file>      The file to read line by line; standard input when omitted or `-`.
 
 Options:
-  -i, --ignore-case    Match case-insensitively (accepted in any position).
-  --help               Print this help and exit.
-  -V, --version        Print the version and exit.
+  -i, --ignore-case      Match case-insensitively (accepted in any position).
+  -v, --invert-match     Print lines that do NOT contain the pattern.
+  -c, --count            Print only the number of matching lines.
+  --help                 Print this help and exit.
+  -V, --version          Print the version and exit.
 
 Exit codes:
   0  match found, or the input was empty
@@ -177,6 +189,7 @@ fn run(invocation: &Invocation) -> io::Result<SearchOutcome> {
     };
 
     let mut matched = false;
+    let mut count = 0usize;
     let mut lines_read = 0;
 
     for (index, line) in input.lines().enumerate() {
@@ -189,10 +202,22 @@ fn run(invocation: &Invocation) -> io::Result<SearchOutcome> {
             line.clone()
         };
 
-        if let Some(position) = haystack.find(&needle) {
+        let hit = haystack.find(&needle);
+        if hit.is_some() != invocation.invert_match {
             matched = true;
-            print_match(index + 1, &line, position, needle.len(), highlight);
+            count += 1;
+            if !invocation.count {
+                if let Some(position) = hit {
+                    print_match(index + 1, &line, position, needle.len(), highlight);
+                } else {
+                    print_match(index + 1, &line, 0, 0, false);
+                }
+            }
         }
+    }
+
+    if invocation.count {
+        println!("{count}");
     }
 
     Ok(if lines_read == 0 {

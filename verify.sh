@@ -72,9 +72,23 @@ fi
 
 assert_exit "-i matching" 0 "$BIN" THE "$TEST_FILE" -i
 assert_exit "-i before the positionals" 0 "$BIN" -i THE "$TEST_FILE"
+assert_exit "-c count" 0 "$BIN" the "$TEST_FILE" -c
+assert_exit "-c combines with -i" 0 "$BIN" -i -c the "$TEST_FILE"
+assert_exit "-v invert" 0 "$BIN" the "$TEST_FILE" -v
+assert_exit "-v with every line matching" 1 "$BIN" e "$TEST_FILE" -v
 assert_exit "--help prints usage" 0 "$BIN" --help
 assert_exit "--version prints version" 0 "$BIN" --version
 assert_exit "-V prints version" 0 "$BIN" -V
+
+# -c must print exactly the matching-line count, nothing else.
+COUNT_OUT="$("$BIN" -i -c the "$TEST_FILE")"
+if [ "$COUNT_OUT" = "3" ]; then
+    echo "PASS: -c prints the matching-line count (exit 0)"
+    pass=$((pass + 1))
+else
+    echo "FAIL: -c printed '$COUNT_OUT', expected 3"
+    fail=$((fail + 1))
+fi
 
 BINARY_FILE="$TMP/binary.dat"
 printf 'hello\0world\n' > "$BINARY_FILE"
