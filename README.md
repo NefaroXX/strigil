@@ -29,7 +29,8 @@ $ strigil the README.md
 - **Buffered line-by-line reading** via `std::io::BufReader`.
 - **Substring matching** — a plain `find()`, not a regex engine.
 - **`--ignore-case`** — folds both the pattern and each line to lowercase
-  before matching.
+  before matching. The flag is accepted anywhere on the command line —
+  before, between, or after the two positional arguments.
 - **ANSI highlighting** — set `COLOR=always` and the first match on each line
   is wrapped in red (`\x1b[31m...\x1b[0m`).
 - **Predictable exit codes** — `0` match, `1` no match, `2` usage error,
@@ -80,6 +81,9 @@ strigil "fn main" src/main.rs
 
 # Case-insensitive search
 strigil ERROR server.log --ignore-case
+
+# Flag order is flexible — before the positionals works too
+strigil --ignore-case ERROR server.log
 
 # Highlight matches in red (single match per line only)
 COLOR=always strigil TODO src/main.rs

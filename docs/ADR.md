@@ -30,7 +30,8 @@ and a file path, it prints every line containing the pattern as
 
 ## PATTERNS
 - Argument parsing by hand from `env::args().skip(1)` — no clap, no derive
-  macros, no third flag other than the exact literal `--ignore-case`.
+  macros. Positionals are collected in order; the literal flag
+  `--ignore-case` is recognized in any position (prototype parity).
 - Buffered, line-at-a-time reading with `BufReader::lines()`; the full file is
   never loaded into memory.
 - Substring matching with `str::find`. For `--ignore-case`, both the pattern
@@ -56,6 +57,10 @@ and a file path, it prints every line containing the pattern as
 - `COLOR=always` is an explicit opt-in via environment variable — there is no
   auto-detection and no `NO_COLOR` handling. Chosen for deterministic,
   testable behaviour over convenience.
+- `--ignore-case` is deliberately accepted in any position rather than only
+  as the third argument: a friendlier grammar (and prototype parity) wins
+  over strict flag position, and the scan cost is negligible for a
+  two-argument CLI.
 
 ## PHILOSOPHY
 - Dependencies are the enemy. If a feature cannot be built with `std`, it does
