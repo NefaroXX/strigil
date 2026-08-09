@@ -1,0 +1,25 @@
+[package]
+name = "strigil"
+version = "0.1.0"
+edition = "2021"
+description = "A minimal, dependency-free clone of grep, written in Rust."
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/NefaroXX/strigil"
+homepage = "https://github.com/NefaroXX/strigil"
+documentation = "https://docs.rs/strigil"
+keywords = ["grep", "cli", "search", "pattern", "text"]
+categories = ["command-line-utilities", "text-processing"]
+authors = ["NefaroXX"]
+rust-version = "1.61"
+
+[[bin]]
+name = "strigil"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
