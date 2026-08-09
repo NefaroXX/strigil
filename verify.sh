@@ -61,6 +61,26 @@ else
     fail=$((fail + 1))
 fi
 
+# COLOR=never must suppress highlighting (stdout is a pipe here anyway).
+NEVER_OUT="$(COLOR=never "$BIN" fox "$TEST_FILE")"
+if printf '%s' "$NEVER_OUT" | grep -qv $'\x1b\[31m'; then
+    echo "PASS: COLOR=never suppresses ANSI highlighting (exit 0)"
+    pass=$((pass + 1))
+else
+    echo "FAIL: COLOR=never still emitted ANSI highlighting"
+    fail=$((fail + 1))
+fi
+
+# NO_COLOR beats COLOR=always, per no-color.org.
+NOCOLOR_OUT="$(NO_COLOR=1 COLOR=always "$BIN" fox "$TEST_FILE")"
+if printf '%s' "$NOCOLOR_OUT" | grep -qv $'\x1b\[31m'; then
+    echo "PASS: NO_COLOR disables highlighting even with COLOR=always (exit 0)"
+    pass=$((pass + 1))
+else
+    echo "FAIL: NO_COLOR did not disable highlighting"
+    fail=$((fail + 1))
+fi
+
 # Standard input: with no file argument, strigil reads stdin.
 if printf '%s\n' 'The quick brown fox' 'jumps over the lazy dog' 'the end' | "$BIN" fox >/dev/null 2>&1; then
     echo "PASS: reads standard input when no file is given (exit 0)"

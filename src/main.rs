@@ -13,7 +13,7 @@
 
 use std::env;
 use std::fs::{self, File};
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, IsTerminal};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -162,7 +162,8 @@ Exit codes:
   3  I/O error
 
 Environment:
-  COLOR=always     Highlight the first match per line in ANSI red."
+  COLOR=always|never|auto   Force, disable, or auto-detect highlighting.
+  NO_COLOR                  When present (any value), disable highlighting."
     );
 }
 
@@ -280,6 +281,22 @@ fn walk_dir(dir: &Path, out: &mut Vec<PathBuf>) -> io::Result<()> {
     Ok(())
 }
 
+/// Decides whether matching lines are highlighted. A present `NO_COLOR`
+/// variable always wins (per no-color.org); otherwise `COLOR=always`,
+/// `COLOR=never`, or `COLOR=auto` force, forbid, or auto-detect. The default
+/// is to highlight only when stdout is a terminal, like grep.
+fn want_highlight() -> bool {
+    if env::var_os("NO_COLOR").is_some() {
+        return false;
+    }
+    match env::var("COLOR").as_deref() {
+        Ok("always") => return true,
+        Ok("never") => return false,
+        _ => {}
+    }
+    io::stdout().is_terminal()
+}
+
 /// Scans one input line by line and prints every line containing `pattern`.
 /// When `prefix` is set, each printed line (or count) is tagged with the
 /// input's display name, grep-style.
@@ -310,10 +327,7 @@ fn run_source(
     } else {
         invocation.pattern.to_string()
     };
-    let highlight = match env::var("COLOR") {
-        Ok(value) => value == "always",
-        Err(_) => false,
-    };
+    let highlight = want_highlight();
 
     let mut matched = false;
     let mut count = 0usize;

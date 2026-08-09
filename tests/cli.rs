@@ -224,6 +224,35 @@ fn color_always_highlights_the_first_match_in_ansi_red() {
 }
 
 #[test]
+fn color_never_disables_highlighting() {
+    let file = temp_file();
+    let out = Command::new(env!("CARGO_BIN_EXE_strigil"))
+        .args(["fox", file.to_str().unwrap()])
+        .env("COLOR", "never")
+        .output()
+        .expect("spawns strigil");
+    assert_eq!(exit_code(&out), 0);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("1:The quick brown fox"));
+    assert!(!stdout.contains('\u{1b}'));
+}
+
+#[test]
+fn no_color_overrides_color_always() {
+    let file = temp_file();
+    let out = Command::new(env!("CARGO_BIN_EXE_strigil"))
+        .args(["fox", file.to_str().unwrap()])
+        .env("COLOR", "always")
+        .env("NO_COLOR", "1")
+        .output()
+        .expect("spawns strigil");
+    assert_eq!(exit_code(&out), 0);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("1:The quick brown fox"));
+    assert!(!stdout.contains('\u{1b}'));
+}
+
+#[test]
 fn plain_output_contains_no_ansi_escape_codes() {
     let file = temp_file();
     let out = run(&["fox", file.to_str().unwrap()]);

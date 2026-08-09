@@ -21,10 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loop. A directory without `-r` is now an I/O error instead of silently
   matching nothing.
 - `--` ends option parsing, so filenames beginning with `-` can be searched.
+- Terminal-aware highlighting: color turns on automatically when stdout is
+  a terminal. `COLOR=always` forces it, `COLOR=never` disables it, and a
+  present `NO_COLOR` variable disables it even when `COLOR=always` is set.
 
 ### Changed
 - Any number of `<file>` arguments are now accepted (previously at most
   one), and unknown dash-prefixed options are rejected as usage errors.
+- Rust MSRV raised from 1.61 to 1.70 for `std::io::IsTerminal`.
 - Standard input: `strigil <pattern>` reads from stdin when no file is given,
   and a `-` file argument also means stdin.
 - `--help` and `--version` flags, both printing to stdout and exiting `0`.

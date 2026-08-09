@@ -46,8 +46,10 @@ $ strigil the README.md
   lines themselves.
 - **`-v, --invert-match`** — print only the lines that do NOT contain the
   pattern.
-- **ANSI highlighting** — set `COLOR=always` and the first match on each line
-  is wrapped in red (`\x1b[31m...\x1b[0m`).
+- **Terminal-aware highlighting** — when stdout is a terminal, the first
+  match on each line is wrapped in red (`\x1b[31m...\x1b[0m`). `COLOR=always`
+  forces it, `COLOR=never` disables it, and a present `NO_COLOR` variable
+  disables it unconditionally.
 - **Predictable exit codes** — `0` match, `1` no match, `2` usage error,
   `3` I/O error.
 
@@ -108,7 +110,7 @@ strigil -i ERROR server.log
 # Flag order is flexible — before the positionals works too
 strigil --ignore-case ERROR server.log
 
-# Highlight matches in red (single match per line only)
+# Color auto-enables on a terminal; force it when piping
 COLOR=always strigil TODO src/main.rs
 
 # Count matching lines
@@ -147,7 +149,8 @@ the file with `std::fs::File` — or locks standard input when no file is given
 — wraps it in `std::io::BufReader`, and iterates `lines()` one at a time. For each line it searches for the pattern with a
 substring `find()`; when `--ignore-case` is given, both sides are folded to
 lowercase first. On a match it prints `{line_number}:{line}` — with the first
-occurrence wrapped in ANSI red when `COLOR=always` is set. `-v` flips the
+occurrence wrapped in ANSI red when stdout is a terminal (`COLOR=always`
+forces it; `COLOR=never` or a present `NO_COLOR` forbids it). `-v` flips the
 test so non-matching lines are printed, and `-c` prints just the count.
 Multiple files are searched one at a time — every line (or count) is tagged
 with its file name, per-source errors go to stderr without stopping the

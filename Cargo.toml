@@ -11,7 +11,7 @@ documentation = "https://docs.rs/strigil"
 keywords = ["grep", "cli", "search", "pattern", "text"]
 categories = ["command-line-utilities", "text-processing"]
 authors = ["NefaroXX"]
-rust-version = "1.61"
+rust-version = "1.70"
 
 [[bin]]
 name = "strigil"
