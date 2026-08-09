@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest an idea for strigil
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea! strigil's mission is minimalism and zero
+        dependencies — proposals should explain why the feature earns its
+        place (see `docs/ADR.md`).
+  - type: textarea
+    id: feature
+    attributes:
+      label: What would you like strigil to do?
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why is this useful?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How do you work around this today?

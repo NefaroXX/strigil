@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a problem with strigil
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please include the
+        exact command you ran and the file that triggers the problem.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the full command, the expected output, and the actual output.
+      placeholder: |
+        strigil --ignore-case error server.log
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The crate version or commit SHA you are running.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS and `rustc -V` output.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: A short input file (or inline content) that triggers the bug.
+      render: bash
