@@ -6,8 +6,8 @@
 
 A minimal, dependency-free clone of `grep`, written in Rust using only the
 standard library. Point it at a pattern and a file — or pipe it some standard
-input — and it prints every matching line, with optional case-insensitive
-matching and ANSI highlighting.
+input — and it prints every matching line, with case-insensitive, counted,
+inverted, or recursive search and terminal-aware highlighting.
 
 ```
 $ strigil the README.md
@@ -18,10 +18,9 @@ $ strigil the README.md
 
 `strigil` is built to be:
 
-- **Dependency-free** — zero external crates. Only `std::fs`, `std::io`, and
-  `std::env`.
-- **Publishable** — a single binary crate, `cargo publish --dry-run` ready.
-- **Runnable** — `cargo run -- <pattern> [<file>]` from anywhere in the repo.
+- **Dependency-free** — zero external crates. The standard library only.
+- **Runnable** — `cargo run -- <pattern> [<file>...]` from anywhere in the
+  repo.
 
 ## Features
 
@@ -40,8 +39,8 @@ $ strigil the README.md
 - **Buffered line-by-line reading** via `std::io::BufReader`.
 - **Substring matching** — a plain `find()`, not a regex engine.
 - **`-i, --ignore-case`** — folds both the pattern and each line to lowercase
-  before matching. The flag is accepted anywhere on the command line —
-  before, between, or after the two positional arguments.
+  before matching. Like every option, it is accepted anywhere on the command
+  line.
 - **`-c, --count`** — print only the number of matching lines instead of the
   lines themselves.
 - **`-v, --invert-match`** — print only the lines that do NOT contain the
@@ -145,10 +144,10 @@ strigil ERROR - < server.log
 ## How it works
 
 `strigil` is intentionally boring. `main` parses the arguments by hand, opens
-the file with `std::fs::File` — or locks standard input when no file is given
-— wraps it in `std::io::BufReader`, and iterates `lines()` one at a time. For each line it searches for the pattern with a
-substring `find()`; when `--ignore-case` is given, both sides are folded to
-lowercase first. On a match it prints `{line_number}:{line}` — with the first
+each file with `std::fs::File` — or locks standard input when no file is given
+— wraps it in `std::io::BufReader`, and iterates `lines()` one at a time. For
+each line it searches for the pattern with a substring `find()`; when
+`--ignore-case` is given, both sides are folded to lowercase first. On a match it prints `{line_number}:{line}` — with the first
 occurrence wrapped in ANSI red when stdout is a terminal (`COLOR=always`
 forces it; `COLOR=never` or a present `NO_COLOR` forbids it). `-v` flips the
 test so non-matching lines are printed, and `-c` prints just the count.
