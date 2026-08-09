@@ -60,6 +60,33 @@ fn ignore_case_flag_matches_case_insensitively() {
 }
 
 #[test]
+fn ignore_case_flag_accepted_before_the_positionals() {
+    let file = temp_file();
+    let out = run(&["--ignore-case", "THE", file.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 0);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("1:The quick brown fox"));
+    assert!(stdout.contains("3:the end"));
+}
+
+#[test]
+fn ignore_case_flag_accepted_between_the_positionals() {
+    let file = temp_file();
+    let out = run(&["THE", "--ignore-case", file.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 0);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("1:The quick brown fox"));
+}
+
+#[test]
+fn usage_error_reports_the_argument_count() {
+    let file = temp_file();
+    let out = run(&["THE", file.to_str().unwrap(), "extra", "more"]);
+    assert_eq!(exit_code(&out), 2);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("got 4"), "stderr was: {stderr}");
+}
+
+#[test]
 fn missing_file_is_an_io_error_exit_three() {
     let out = run(&["fox", "definitely-not-a-real-file.txt"]);
     assert_eq!(exit_code(&out), 3);

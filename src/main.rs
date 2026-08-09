@@ -20,21 +20,30 @@ struct Invocation<'a> {
 }
 
 impl<'a> Invocation<'a> {
-    /// Parses the CLI arguments. Exactly 2 positional arguments are required;
-    /// a third positional `--ignore-case` flag is optional.
+    /// Parses the CLI arguments. Exactly two positional arguments are
+    /// required (`<pattern>` and `<file>`); the `--ignore-case` flag may
+    /// appear anywhere on the command line.
     fn parse(args: &'a [String]) -> Result<Self, String> {
-        match args {
+        let mut positional: Vec<&'a str> = Vec::new();
+        let mut ignore_case = false;
+
+        for arg in args {
+            match arg.as_str() {
+                "--ignore-case" => ignore_case = true,
+                other => positional.push(other),
+            }
+        }
+
+        match positional.as_slice() {
             [pattern, file] => Ok(Invocation {
                 pattern,
                 file,
-                ignore_case: false,
+                ignore_case,
             }),
-            [pattern, file, flag] if flag == "--ignore-case" => Ok(Invocation {
-                pattern,
-                file,
-                ignore_case: true,
-            }),
-            _ => Err("expected <pattern> <file> [--ignore-case]".to_string()),
+            _ => Err(format!(
+                "expected exactly 2 positional arguments (<pattern> <file>), got {}",
+                positional.len()
+            )),
         }
     }
 }

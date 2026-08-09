@@ -45,6 +45,8 @@ assert_exit() {
 assert_exit "matching pattern in a 3-line file" 0 "$BIN" fox "$TEST_FILE"
 assert_exit "no matches but file read successfully" 1 "$BIN" zebra "$TEST_FILE"
 assert_exit "--ignore-case matching" 0 "$BIN" THE "$TEST_FILE" --ignore-case
+assert_exit "--ignore-case before the positionals" 0 "$BIN" --ignore-case THE "$TEST_FILE"
+assert_exit "--ignore-case between the positionals" 0 "$BIN" THE --ignore-case "$TEST_FILE"
 assert_exit "missing file error" 3 "$BIN" fox "$TMP/does-not-exist.txt"
 assert_exit "wrong arg count" 2 "$BIN" fox
 
