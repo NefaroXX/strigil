@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `-i` and `-V` short flags, aliasing `--ignore-case` and `--version`
+  respectively (grep-style); accepted anywhere alongside the long forms.
 - Standard input: `strigil <pattern>` reads from stdin when no file is given,
   and a `-` file argument also means stdin.
 - `--help` and `--version` flags, both printing to stdout and exiting `0`.

@@ -192,6 +192,34 @@ fn version_flag_prints_the_version_and_exits_zero() {
 }
 
 #[test]
+fn short_i_flag_aliases_ignore_case() {
+    let file = temp_file();
+    let out = run(&["THE", file.to_str().unwrap(), "-i"]);
+    assert_eq!(exit_code(&out), 0);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("1:The quick brown fox"));
+    assert!(stdout.contains("3:the end"));
+}
+
+#[test]
+fn short_i_flag_accepted_before_the_positionals() {
+    let file = temp_file();
+    let out = run(&["-i", "THE", file.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 0);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("1:The quick brown fox"));
+}
+
+#[test]
+fn capital_v_flag_prints_the_version() {
+    let out = run(&["-V"]);
+    assert_eq!(exit_code(&out), 0);
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        format!("strigil {}", env!("CARGO_PKG_VERSION"))
+    );
+}
+
+#[test]
 fn binary_input_with_a_match_prints_binary_file_matches() {
     let path = std::env::temp_dir().join(format!("strigil_cli_test_{}.bin", std::process::id()));
     fs::write(&path, b"hello\x00world\n").expect("writes a binary temp file");

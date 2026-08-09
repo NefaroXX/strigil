@@ -1,6 +1,6 @@
 //! strigil — a minimal, dependency-free grep clone.
 //!
-//! Usage: `strigil <pattern> [<file>] [--ignore-case] [--help] [--version]`
+//! Usage: `strigil <pattern> [<file>] [-i] [-V] [--help]`
 //!
 //! Reads `<file>` — or standard input when no file is given — line by line
 //! and prints every line containing `<pattern>` as `{line_number}:{line}`.
@@ -16,7 +16,7 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 use std::process::ExitCode;
 
-const USAGE: &str = "Usage: strigil <pattern> [<file>] [--ignore-case] [--help] [--version]";
+const USAGE: &str = "Usage: strigil <pattern> [<file>] [options]";
 
 /// What the command line asked for, once parsed.
 enum Parsed<'a> {
@@ -38,8 +38,9 @@ struct Invocation<'a> {
 impl<'a> Invocation<'a> {
     /// Parses the CLI arguments. The pattern is required; the file is
     /// optional and falls back to standard input (a literal `-` also names
-    /// standard input). `--ignore-case` is accepted in any position, and
-    /// `--help` / `--version` short-circuit to informational output.
+    /// standard input). `--ignore-case` (or `-i`) is accepted in any
+    /// position, and `--help` / `--version` (or `-V`) short-circuit to
+    /// informational output.
     fn parse(args: &'a [String]) -> Result<Parsed<'a>, String> {
         let mut positional: Vec<&'a str> = Vec::new();
         let mut ignore_case = false;
@@ -48,9 +49,9 @@ impl<'a> Invocation<'a> {
 
         for arg in args {
             match arg.as_str() {
-                "--ignore-case" => ignore_case = true,
+                "--ignore-case" | "-i" => ignore_case = true,
                 "--help" => help = true,
-                "--version" => version = true,
+                "--version" | "-V" => version = true,
                 other => positional.push(other),
             }
         }
@@ -126,9 +127,9 @@ Arguments:
   <file>      The file to read line by line; standard input when omitted or `-`.
 
 Options:
-  --ignore-case    Match case-insensitively (accepted in any position).
-  --help           Print this help and exit.
-  --version        Print the version and exit.
+  -i, --ignore-case    Match case-insensitively (accepted in any position).
+  --help               Print this help and exit.
+  -V, --version        Print the version and exit.
 
 Exit codes:
   0  match found, or the input was empty

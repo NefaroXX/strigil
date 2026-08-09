@@ -26,7 +26,7 @@ $ strigil the README.md
 ## Features
 
 - **Manual CLI parsing** — no clap, no derive macros:
-  `strigil <pattern> [<file>] [--ignore-case] [--help] [--version]`.
+  `strigil <pattern> [<file>] [-i] [-V] [--help] [--version]`.
 - **Standard input** — omit the file (or pass `-`) to search stdin, so it
   composes in pipelines.
 - **`--help` and `--version`** — informational flags that exit `0`.
@@ -34,7 +34,7 @@ $ strigil the README.md
   raw-byte search with a grep-style "binary file matches" report.
 - **Buffered line-by-line reading** via `std::io::BufReader`.
 - **Substring matching** — a plain `find()`, not a regex engine.
-- **`--ignore-case`** — folds both the pattern and each line to lowercase
+- **`-i, --ignore-case`** — folds both the pattern and each line to lowercase
   before matching. The flag is accepted anywhere on the command line —
   before, between, or after the two positional arguments.
 - **ANSI highlighting** — set `COLOR=always` and the first match on each line
@@ -68,18 +68,19 @@ cargo build --release
 ## Usage
 
 ```bash
-strigil <pattern> [<file>] [--ignore-case] [--help] [--version]
+strigil <pattern> [<file>] [-i] [-V] [--help] [--version]
 ```
 
 | Argument | Description |
 | --- | --- |
 | `<pattern>` | The literal substring to search for. |
 | `<file>` | The file to read line by line; standard input when omitted or `-`. |
-| `--ignore-case` | Match case-insensitively (accepted in any position). |
+| `-i, --ignore-case` | Match case-insensitively (accepted in any position). |
 | `--help` | Print usage and exit `0`. |
-| `--version` | Print the version and exit `0`. |
+| `-V, --version` | Print the version and exit `0`. |
 
-> **Note:** matching is case-sensitive by default. There is no `-i` short flag.
+> **Note:** matching is case-sensitive by default. Short flags `-i` and `-V`
+> work exactly like their long counterparts.
 
 ### Examples
 
@@ -87,8 +88,9 @@ strigil <pattern> [<file>] [--ignore-case] [--help] [--version]
 # Find every line containing "fn main" in main.rs
 strigil "fn main" src/main.rs
 
-# Case-insensitive search
+# Case-insensitive search (--ignore-case or its short form -i)
 strigil ERROR server.log --ignore-case
+strigil -i ERROR server.log
 
 # Flag order is flexible — before the positionals works too
 strigil --ignore-case ERROR server.log

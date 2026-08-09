@@ -70,8 +70,11 @@ else
     fail=$((fail + 1))
 fi
 
+assert_exit "-i matching" 0 "$BIN" THE "$TEST_FILE" -i
+assert_exit "-i before the positionals" 0 "$BIN" -i THE "$TEST_FILE"
 assert_exit "--help prints usage" 0 "$BIN" --help
 assert_exit "--version prints version" 0 "$BIN" --version
+assert_exit "-V prints version" 0 "$BIN" -V
 
 BINARY_FILE="$TMP/binary.dat"
 printf 'hello\0world\n' > "$BINARY_FILE"
