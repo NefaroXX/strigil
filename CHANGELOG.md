@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `-c` / `--count` prints only the number of matching lines, and
   `-v` / `--invert-match` prints only the lines that do NOT contain the
   pattern; both combine with `-i` and with each other.
+- Multiple `<file>` arguments: every printed line (or `-c` count) is
+  prefixed with its file name, and a missing file is reported to stderr
+  without hiding matches from the other files.
+- `-r` / `--recursive` directory search: directories are walked in sorted
+  order and symlinks are skipped, so recursion is deterministic and cannot
+  loop. A directory without `-r` is now an I/O error instead of silently
+  matching nothing.
+- `--` ends option parsing, so filenames beginning with `-` can be searched.
+
+### Changed
+- Any number of `<file>` arguments are now accepted (previously at most
+  one), and unknown dash-prefixed options are rejected as usage errors.
 - Standard input: `strigil <pattern>` reads from stdin when no file is given,
   and a `-` file argument also means stdin.
 - `--help` and `--version` flags, both printing to stdout and exiting `0`.

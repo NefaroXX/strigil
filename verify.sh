@@ -49,7 +49,7 @@ assert_exit "--ignore-case before the positionals" 0 "$BIN" --ignore-case THE "$
 assert_exit "--ignore-case between the positionals" 0 "$BIN" THE --ignore-case "$TEST_FILE"
 assert_exit "missing file error" 3 "$BIN" fox "$TMP/does-not-exist.txt"
 assert_exit "wrong arg count" 2 "$BIN"
-assert_exit "too many positional arguments" 2 "$BIN" fox "$TEST_FILE" extra
+assert_exit "unrecognized option" 2 "$BIN" fox "$TEST_FILE" --wat
 
 # COLOR=always must wrap the first match per line in ANSI red.
 OUT="$(COLOR=always "$BIN" fox "$TEST_FILE")"
@@ -94,6 +94,28 @@ BINARY_FILE="$TMP/binary.dat"
 printf 'hello\0world\n' > "$BINARY_FILE"
 assert_exit "binary file with a match" 0 "$BIN" hello "$BINARY_FILE"
 assert_exit "binary file without a match" 1 "$BIN" nope "$BINARY_FILE"
+
+SECOND_FILE="$TMP/second.txt"
+printf 'nothing here\n' > "$SECOND_FILE"
+SUB_DIR="$TMP/sub"
+mkdir -p "$SUB_DIR"
+printf 'The quick brown fox\n' > "$SUB_DIR/nested.txt"
+
+assert_exit "multiple files" 0 "$BIN" fox "$TEST_FILE" "$SECOND_FILE"
+assert_exit "recursive search" 0 "$BIN" -r fox "$TMP"
+assert_exit "directory without -r" 3 "$BIN" fox "$TMP"
+assert_exit "all files missing" 3 "$BIN" fox "$TMP/nope-1.txt" "$TMP/nope-2.txt"
+assert_exit "recursive on a missing path" 3 "$BIN" -r fox "$TMP/does-not-exist"
+
+# Multi-file matches must carry a file: prefix.
+MULTI_OUT="$("$BIN" fox "$TEST_FILE" "$SECOND_FILE")"
+if printf '%s' "$MULTI_OUT" | grep -q 'sample.txt:1:The quick brown fox'; then
+    echo "PASS: multiple files are prefixed with their name (exit 0)"
+    pass=$((pass + 1))
+else
+    echo "FAIL: multi-file output missing the expected 'sample.txt:1:' prefix"
+    fail=$((fail + 1))
+fi
 
 echo "----"
 echo "$pass passed, $fail failed"

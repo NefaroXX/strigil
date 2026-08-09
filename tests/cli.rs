@@ -8,7 +8,12 @@ use std::process::{Command, Output, Stdio};
 const THREE_LINES: &str = "The quick brown fox\njumps over the lazy dog\nthe end\n";
 
 fn temp_file() -> PathBuf {
-    let path = std::env::temp_dir().join(format!("strigil_cli_test_{}.txt", std::process::id()));
+    // Thread id keeps parallel tests from racing on a shared fixture file.
+    let path = std::env::temp_dir().join(format!(
+        "strigil_cli_test_{}_{:?}.txt",
+        std::process::id(),
+        std::thread::current().id()
+    ));
     fs::write(&path, THREE_LINES).expect("writes a temp test file");
     path
 }
@@ -97,12 +102,93 @@ fn ignore_case_flag_accepted_between_the_positionals() {
 }
 
 #[test]
-fn usage_error_reports_the_argument_count() {
+fn multiple_files_are_searched_with_a_filename_prefix() {
+    let dir = std::env::temp_dir().join(format!("strigil_cli_multi_{}", std::process::id()));
+    fs::create_dir_all(&dir).expect("creates a temp directory");
+    let a = dir.join("a.txt");
+    let b = dir.join("b.txt");
+    fs::write(&a, THREE_LINES).expect("writes a.txt");
+    fs::write(&b, "nothing here\n").expect("writes b.txt");
+    let out = run(&["fox", a.to_str().unwrap(), b.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 0);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("a.txt:1:The quick brown fox"),
+        "stdout was: {stdout}"
+    );
+    assert!(!stdout.contains("b.txt:"), "stdout was: {stdout}");
+}
+
+#[test]
+fn a_missing_file_among_others_does_not_hide_matches() {
     let file = temp_file();
-    let out = run(&["THE", file.to_str().unwrap(), "extra", "more"]);
-    assert_eq!(exit_code(&out), 2);
+    let out = run(&["fox", file.to_str().unwrap(), "definitely-missing.txt"]);
+    assert_eq!(exit_code(&out), 0);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("1:The quick brown fox"),
+        "stdout was: {stdout}"
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("got 4"), "stderr was: {stderr}");
+    assert!(
+        stderr.contains("definitely-missing.txt"),
+        "stderr was: {stderr}"
+    );
+}
+
+#[test]
+fn every_file_missing_exits_three() {
+    let out = run(&["fox", "missing-a.txt", "missing-b.txt"]);
+    assert_eq!(exit_code(&out), 3);
+}
+
+#[test]
+fn count_with_multiple_files_prefixes_each_count() {
+    let dir = std::env::temp_dir().join(format!("strigil_cli_count_{}", std::process::id()));
+    fs::create_dir_all(&dir).expect("creates a temp directory");
+    let a = dir.join("a.txt");
+    let b = dir.join("b.txt");
+    fs::write(&a, THREE_LINES).expect("writes a.txt");
+    fs::write(&b, "nothing here\n").expect("writes b.txt");
+    let out = run(&["-c", "fox", a.to_str().unwrap(), b.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 0);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("a.txt:1"), "stdout was: {stdout}");
+    assert!(stdout.contains("b.txt:0"), "stdout was: {stdout}");
+}
+
+#[test]
+fn recursive_flag_searches_an_entire_directory_tree() {
+    let dir = std::env::temp_dir().join(format!("strigil_cli_tree_{}", std::process::id()));
+    let nested = dir.join("sub");
+    fs::create_dir_all(&nested).expect("creates a temp tree");
+    fs::write(nested.join("nested.txt"), THREE_LINES).expect("writes nested.txt");
+    let out = run(&["-r", "fox", dir.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 0);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("nested.txt:1:The quick brown fox"),
+        "stdout was: {stdout}"
+    );
+}
+
+#[test]
+fn double_dash_allows_filenames_starting_with_a_dash() {
+    let dir = std::env::temp_dir().join(format!("strigil_cli_dash_{}", std::process::id()));
+    fs::create_dir_all(&dir).expect("creates a temp directory");
+    let dashed = dir.join("-dashed.txt");
+    fs::write(&dashed, THREE_LINES).expect("writes -dashed.txt");
+    let out = run(&["fox", "--", dashed.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 0);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("1:The quick brown fox"));
+}
+
+#[test]
+fn directory_without_recursive_is_an_io_error() {
+    let dir = std::env::temp_dir().join(format!("strigil_cli_dir_{}", std::process::id()));
+    fs::create_dir_all(&dir).expect("creates a temp directory");
+    let out = run(&["fox", dir.to_str().unwrap()]);
+    assert_eq!(exit_code(&out), 3);
 }
 
 #[test]
@@ -272,7 +358,11 @@ fn count_and_invert_combine() {
 
 #[test]
 fn binary_input_with_a_match_prints_binary_file_matches() {
-    let path = std::env::temp_dir().join(format!("strigil_cli_test_{}.bin", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "strigil_cli_test_{}_{:?}.bin",
+        std::process::id(),
+        std::thread::current().id()
+    ));
     fs::write(&path, b"hello\x00world\n").expect("writes a binary temp file");
     let out = run(&["hello", path.to_str().unwrap()]);
     assert_eq!(exit_code(&out), 0);
@@ -281,7 +371,11 @@ fn binary_input_with_a_match_prints_binary_file_matches() {
 
 #[test]
 fn binary_input_without_a_match_exits_one() {
-    let path = std::env::temp_dir().join(format!("strigil_cli_test_{}.bin", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "strigil_cli_test_{}_{:?}_nope.bin",
+        std::process::id(),
+        std::thread::current().id()
+    ));
     fs::write(&path, b"hello\x00world\n").expect("writes a binary temp file");
     let out = run(&["zebra", path.to_str().unwrap()]);
     assert_eq!(exit_code(&out), 1);

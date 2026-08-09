@@ -29,6 +29,11 @@ $ strigil the README.md
   `strigil <pattern> [<file>] [options]`.
 - **Standard input** — omit the file (or pass `-`) to search stdin, so it
   composes in pipelines.
+- **Multiple files** — pass any number of `<file>` arguments; each line (and
+  each `-c` count) is prefixed with its file name. A `-` among the files
+  reads standard input at that position.
+- **Recursive search** — `-r` walks directories (skipping symlinks, in
+  sorted order) and searches every file beneath them.
 - **`--help` and `--version`** — informational flags that exit `0`.
 - **Binary input detection** — a NUL byte in the first chunk switches to
   raw-byte search with a grep-style "binary file matches" report.
@@ -72,21 +77,23 @@ cargo build --release
 ## Usage
 
 ```bash
-strigil <pattern> [<file>] [-i] [-c] [-v] [-V] [--help]
+strigil <pattern> [<file>...] [-i] [-c] [-v] [-r] [-V] [--help]
 ```
 
 | Argument | Description |
 | --- | --- |
 | `<pattern>` | The literal substring to search for. |
-| `<file>` | The file to read line by line; standard input when omitted or `-`. |
+| `<file>` | One or more files to read line by line; standard input when omitted or `-`. Directories are searched recursively with `-r`. |
 | `-i, --ignore-case` | Match case-insensitively (accepted in any position). |
 | `--help` | Print usage and exit `0`. |
 | `-V, --version` | Print the version and exit `0`. |
 | `-c, --count` | Print only the number of matching lines. |
 | `-v, --invert-match` | Print only lines that do NOT contain the pattern. |
+| `-r, --recursive` | Search directories recursively (symlinks skipped, entries sorted). |
+| `--` | End of options; remaining arguments are treated as files. |
 
 > **Note:** matching is case-sensitive by default. Short flags `-i`, `-c`,
-> `-v`, and `-V` work exactly like their long counterparts.
+> `-v`, `-r`, and `-V` work exactly like their long counterparts.
 
 ### Examples
 
@@ -109,6 +116,15 @@ strigil -c ERROR server.log
 
 # Invert — every line NOT containing the pattern
 strigil -v "DEBUG" server.log
+
+# Search every file under a directory tree
+strigil -r TODO src/
+
+# Multiple files at once
+strigil fox a.txt b.txt
+
+# Filenames starting with '-' need the `--` separator
+strigil fox -- -not-a-flag.txt
 
 # Search standard input — no file argument, or `-`
 ps aux | strigil python
@@ -133,7 +149,11 @@ substring `find()`; when `--ignore-case` is given, both sides are folded to
 lowercase first. On a match it prints `{line_number}:{line}` — with the first
 occurrence wrapped in ANSI red when `COLOR=always` is set. `-v` flips the
 test so non-matching lines are printed, and `-c` prints just the count.
-Errors bubble up with the `?` operator and are mapped to the exit codes above.
+Multiple files are searched one at a time — every line (or count) is tagged
+with its file name, per-source errors go to stderr without stopping the
+others, and `-r` expands directories in sorted order while skipping
+symlinks so recursion can never loop. Errors bubble up with the `?`
+operator and are mapped to the exit codes above.
 
 There is no regex engine, no glob handling, and no memory beyond one line at a
 time (binary input is the exception: a small overlapping window is kept while

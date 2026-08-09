@@ -1,6 +1,6 @@
 //! strigil — a minimal, dependency-free grep clone.
 //!
-//! Usage: `strigil <pattern> [<file>] [-i] [-V] [--help]`
+//! Usage: `strigil <pattern> [<file>...] [-i] [-c] [-v] [-r] [-V] [--help]`
 //!
 //! Reads `<file>` — or standard input when no file is given — line by line
 //! and prints every line containing `<pattern>` as `{line_number}:{line}`.
@@ -12,8 +12,9 @@
 //! `2` usage error, `3` I/O error.
 
 use std::env;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader};
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const USAGE: &str = "Usage: strigil <pattern> [<file>] [options]";
@@ -31,33 +32,46 @@ enum Parsed<'a> {
 /// One parsed invocation: what to look for, where, and how.
 struct Invocation<'a> {
     pattern: &'a str,
-    file: Option<&'a str>,
+    files: Vec<&'a str>,
     ignore_case: bool,
     invert_match: bool,
     count: bool,
+    recursive: bool,
 }
 
 impl<'a> Invocation<'a> {
-    /// Parses the CLI arguments. The pattern is required; the file is
-    /// optional and falls back to standard input (a literal `-` also names
-    /// standard input). `-i`, `-c`, and `-v` (with their long forms) are
-    /// accepted in any position, and `--help` / `--version` (or `-V`)
-    /// short-circuit to informational output.
+    /// Parses the CLI arguments. The pattern is required; any following
+    /// positional arguments are files (or directories with `-r`), and an
+    /// empty file list falls back to standard input (a literal `-` also
+    /// names standard input). Flags are accepted in any position, `--` ends
+    /// option parsing, and `--help` / `--version` (or `-V`) short-circuit
+    /// to informational output.
     fn parse(args: &'a [String]) -> Result<Parsed<'a>, String> {
         let mut positional: Vec<&'a str> = Vec::new();
         let mut ignore_case = false;
         let mut invert_match = false;
         let mut count = false;
+        let mut recursive = false;
         let mut help = false;
         let mut version = false;
+        let mut after_dashes = false;
 
         for arg in args {
+            if after_dashes {
+                positional.push(arg);
+                continue;
+            }
             match arg.as_str() {
+                "--" => after_dashes = true,
                 "--ignore-case" | "-i" => ignore_case = true,
                 "--invert-match" | "-v" => invert_match = true,
                 "--count" | "-c" => count = true,
+                "--recursive" | "-r" => recursive = true,
                 "--help" => help = true,
                 "--version" | "-V" => version = true,
+                other if other.starts_with('-') && other != "-" => {
+                    return Err(format!("unrecognized option '{other}'"));
+                }
                 other => positional.push(other),
             }
         }
@@ -72,23 +86,22 @@ impl<'a> Invocation<'a> {
         match positional.as_slice() {
             [pattern] => Ok(Parsed::Run(Invocation {
                 pattern,
-                file: None,
+                files: Vec::new(),
                 ignore_case,
                 invert_match,
                 count,
+                recursive,
             })),
-            [pattern, file] => {
-                let file = if *file == "-" { None } else { Some(*file) };
-                Ok(Parsed::Run(Invocation {
-                    pattern,
-                    file,
-                    ignore_case,
-                    invert_match,
-                    count,
-                }))
-            }
+            [pattern, files @ ..] => Ok(Parsed::Run(Invocation {
+                pattern,
+                files: files.to_vec(),
+                ignore_case,
+                invert_match,
+                count,
+                recursive,
+            })),
             _ => Err(format!(
-                "expected a pattern and at most one file (<pattern> [<file>]), got {}",
+                "expected a pattern followed by files (<pattern> [<file>...]), got {}",
                 positional.len()
             )),
         }
@@ -115,13 +128,10 @@ fn main() -> ExitCode {
         }
     };
 
-    match run(&invocation) {
-        Ok(SearchOutcome::MatchFound) | Ok(SearchOutcome::EmptyFile) => ExitCode::SUCCESS,
-        Ok(SearchOutcome::NoMatch) => ExitCode::from(1),
-        Err(error) => {
-            eprintln!("strigil: {error}");
-            ExitCode::from(3)
-        }
+    match run_all(&invocation) {
+        RunOutcome::Matches | RunOutcome::Empty => ExitCode::SUCCESS,
+        RunOutcome::NoMatches => ExitCode::from(1),
+        RunOutcome::Error => ExitCode::from(3),
     }
 }
 
@@ -134,12 +144,14 @@ fn print_help() {
 
 Arguments:
   <pattern>   The literal substring to search for.
-  <file>      The file to read line by line; standard input when omitted or `-`.
+  <file>      One or more files to read line by line; standard input when
+              omitted or `-`. Directories are searched recursively with `-r`.
 
 Options:
   -i, --ignore-case      Match case-insensitively (accepted in any position).
   -v, --invert-match     Print lines that do NOT contain the pattern.
   -c, --count            Print only the number of matching lines.
+  -r, --recursive        Search directories recursively.
   --help                 Print this help and exit.
   -V, --version          Print the version and exit.
 
@@ -154,17 +166,132 @@ Environment:
     );
 }
 
+/// How the whole search over all inputs ended.
+enum RunOutcome {
+    Matches,
+    NoMatches,
+    Empty,
+    Error,
+}
+
 enum SearchOutcome {
     MatchFound,
     NoMatch,
     EmptyFile,
 }
 
-/// Scans the input line by line and prints every line containing `pattern`.
-fn run(invocation: &Invocation) -> io::Result<SearchOutcome> {
-    let mut input: Box<dyn BufRead> = match invocation.file {
-        Some(path) => Box::new(BufReader::new(File::open(path)?)),
-        None => Box::new(io::stdin().lock()),
+/// One searchable input: a regular file or standard input.
+enum Source {
+    File(PathBuf),
+    Stdin,
+}
+
+/// Runs the search over every resolved input. Per-source I/O errors are
+/// reported to stderr without stopping the remaining sources.
+fn run_all(invocation: &Invocation) -> RunOutcome {
+    let files: Vec<&str> = if invocation.files.is_empty() {
+        vec!["-"]
+    } else {
+        invocation.files.clone()
+    };
+
+    let mut sources: Vec<(String, Source)> = Vec::new();
+    let mut any_error = false;
+    for raw in &files {
+        match expand(raw, invocation.recursive) {
+            Ok(found) => sources.extend(found),
+            Err(error) => {
+                eprintln!("strigil: {raw}: {error}");
+                any_error = true;
+            }
+        }
+    }
+
+    // Filenames are prefixed when searching several inputs — or whenever a
+    // directory is being walked, matching `grep -r`'s always-prefix rule.
+    let prefix = sources.len() > 1 || invocation.recursive;
+    let mut any_match = false;
+    let mut empty_seen = false;
+    for (name, source) in &sources {
+        match run_source(invocation, source, name, prefix) {
+            Ok(SearchOutcome::MatchFound) => any_match = true,
+            Ok(SearchOutcome::EmptyFile) => empty_seen = true,
+            Ok(SearchOutcome::NoMatch) => {}
+            Err(error) => {
+                eprintln!("strigil: {name}: {error}");
+                any_error = true;
+            }
+        }
+    }
+
+    if any_match {
+        RunOutcome::Matches
+    } else if any_error {
+        RunOutcome::Error
+    } else if empty_seen && sources.len() == 1 {
+        RunOutcome::Empty
+    } else {
+        RunOutcome::NoMatches
+    }
+}
+
+/// Expands one command-line input into concrete sources: a literal `-` names
+/// standard input, a file is used as-is, and with `--recursive` a directory
+/// is walked in sorted order. Without `--recursive`, a directory argument is
+/// rejected so it fails loudly instead of silently matching nothing.
+fn expand(raw: &str, recursive: bool) -> io::Result<Vec<(String, Source)>> {
+    if raw == "-" {
+        return Ok(vec![("<standard input>".to_string(), Source::Stdin)]);
+    }
+
+    let path = Path::new(raw);
+    let metadata = fs::metadata(path)?;
+    if metadata.is_dir() {
+        if !recursive {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "is a directory (use -r to search recursively)",
+            ));
+        }
+        let mut files: Vec<PathBuf> = Vec::new();
+        walk_dir(path, &mut files)?;
+        return Ok(files
+            .into_iter()
+            .map(|file| (file.display().to_string(), Source::File(file)))
+            .collect());
+    }
+    Ok(vec![(raw.to_string(), Source::File(PathBuf::from(raw)))])
+}
+
+/// Collects regular files under `dir`, sorted by name for deterministic
+/// output. Symlinks are skipped so recursion can never loop through them.
+fn walk_dir(dir: &Path, out: &mut Vec<PathBuf>) -> io::Result<()> {
+    let mut entries: Vec<_> = fs::read_dir(dir)?.collect::<Result<_, _>>()?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let path = entry.path();
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            walk_dir(&path, out)?;
+        } else if file_type.is_file() {
+            out.push(path);
+        }
+    }
+    Ok(())
+}
+
+/// Scans one input line by line and prints every line containing `pattern`.
+/// When `prefix` is set, each printed line (or count) is tagged with the
+/// input's display name, grep-style.
+fn run_source(
+    invocation: &Invocation,
+    source: &Source,
+    name: &str,
+    prefix: bool,
+) -> io::Result<SearchOutcome> {
+    let mut input: Box<dyn BufRead> = match source {
+        Source::File(path) => Box::new(BufReader::new(File::open(path)?)),
+        Source::Stdin => Box::new(io::stdin().lock()),
     };
 
     // Binary heuristic, in the spirit of grep: an input whose first chunk
@@ -175,7 +302,7 @@ fn run(invocation: &Invocation) -> io::Result<SearchOutcome> {
     };
 
     if is_binary {
-        return run_binary(&mut *input, invocation);
+        return run_binary(&mut *input, invocation, name);
     }
 
     let needle = if invocation.ignore_case {
@@ -208,16 +335,28 @@ fn run(invocation: &Invocation) -> io::Result<SearchOutcome> {
             count += 1;
             if !invocation.count {
                 if let Some(position) = hit {
-                    print_match(index + 1, &line, position, needle.len(), highlight);
+                    print_match(
+                        prefix,
+                        name,
+                        index + 1,
+                        &line,
+                        position,
+                        needle.len(),
+                        highlight,
+                    );
                 } else {
-                    print_match(index + 1, &line, 0, 0, false);
+                    print_match(prefix, name, index + 1, &line, 0, 0, false);
                 }
             }
         }
     }
 
     if invocation.count {
-        println!("{count}");
+        if prefix {
+            println!("{name}:{count}");
+        } else {
+            println!("{count}");
+        }
     }
 
     Ok(if lines_read == 0 {
@@ -233,17 +372,20 @@ fn run(invocation: &Invocation) -> io::Result<SearchOutcome> {
 /// matches that straddle a chunk boundary from being missed. Output is a
 /// single grep-style "binary file matches" line; per-line rendering is
 /// skipped because binary data has no reliable line structure.
-fn run_binary(input: &mut dyn BufRead, invocation: &Invocation) -> io::Result<SearchOutcome> {
+fn run_binary(
+    input: &mut dyn BufRead,
+    invocation: &Invocation,
+    name: &str,
+) -> io::Result<SearchOutcome> {
     let needle = if invocation.ignore_case {
         invocation.pattern.to_lowercase().into_bytes()
     } else {
         invocation.pattern.as_bytes().to_vec()
     };
-    let source = invocation.file.unwrap_or("<standard input>");
 
     if needle.is_empty() {
         // An empty pattern matches anything — even binary input.
-        println!("strigil: {source}: binary file matches");
+        println!("strigil: {name}: binary file matches");
         return Ok(SearchOutcome::MatchFound);
     }
 
@@ -258,7 +400,7 @@ fn run_binary(input: &mut dyn BufRead, invocation: &Invocation) -> io::Result<Se
 
         window.extend_from_slice(chunk);
         if window.windows(needle.len()).any(|w| w == needle) {
-            println!("strigil: {source}: binary file matches");
+            println!("strigil: {name}: binary file matches");
             return Ok(SearchOutcome::MatchFound);
         }
 
@@ -273,9 +415,23 @@ fn run_binary(input: &mut dyn BufRead, invocation: &Invocation) -> io::Result<Se
     Ok(SearchOutcome::NoMatch)
 }
 
-/// Prints `line_number:line`, wrapping the first occurrence of the match in
-/// ANSI red when `highlight` is set.
-fn print_match(line_number: usize, line: &str, position: usize, length: usize, highlight: bool) {
+/// Prints `{line_number}:{line}` — prefixed with the source name when
+/// multiple inputs are searched — wrapping the first occurrence of the match
+/// in ANSI red when `highlight` is set.
+fn print_match(
+    prefix: bool,
+    name: &str,
+    line_number: usize,
+    line: &str,
+    position: usize,
+    length: usize,
+    highlight: bool,
+) {
+    let head = if prefix {
+        format!("{name}:{line_number}:")
+    } else {
+        format!("{line_number}:")
+    };
     if highlight {
         let end = position.saturating_add(length);
         // The match position comes from the case-folded haystack. Unicode case
@@ -284,8 +440,7 @@ fn print_match(line_number: usize, line: &str, position: usize, length: usize, h
         // slicing mid-character.
         if line.is_char_boundary(position) && line.is_char_boundary(end) {
             println!(
-                "{}:{}\x1b[31m{}\x1b[0m{}",
-                line_number,
+                "{head}{}\x1b[31m{}\x1b[0m{}",
                 &line[..position],
                 &line[position..end],
                 &line[end..]
@@ -293,5 +448,5 @@ fn print_match(line_number: usize, line: &str, position: usize, length: usize, h
             return;
         }
     }
-    println!("{line_number}:{line}");
+    println!("{head}{line}");
 }
