@@ -24,10 +24,16 @@ impl<'a> Invocation<'a> {
     /// a third positional `--ignore-case` flag is optional.
     fn parse(args: &'a [String]) -> Result<Self, String> {
         match args {
-            [pattern, file] => Ok(Invocation { pattern, file, ignore_case: false }),
-            [pattern, file, flag] if flag == "--ignore-case" => {
-                Ok(Invocation { pattern, file, ignore_case: true })
-            }
+            [pattern, file] => Ok(Invocation {
+                pattern,
+                file,
+                ignore_case: false,
+            }),
+            [pattern, file, flag] if flag == "--ignore-case" => Ok(Invocation {
+                pattern,
+                file,
+                ignore_case: true,
+            }),
             _ => Err("expected <pattern> <file> [--ignore-case]".to_string()),
         }
     }
