@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-09
+
 ### Added
 - `-i` and `-V` short flags, aliasing `--ignore-case` and `--version`
   respectively (grep-style); accepted anywhere alongside the long forms.
