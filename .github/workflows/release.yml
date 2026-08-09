@@ -4,9 +4,7 @@ on:
   push:
     tags:
       - 'v*'
-
-env:
-  CARGO_TERM_COLOR: always
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,19 +12,20 @@ permissions:
 jobs:
   build:
     name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            suffix: ''
+            ext: ''
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            suffix: '.exe'
+            ext: .exe
           - os: macos-latest
-            target: aarch64-apple-darwin
-            suffix: ''
+            target: x86_64-apple-darwin
+            ext: ''
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -36,35 +35,41 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build (release, locked)
+        run: cargo build --release --locked
 
-      - name: Rename binary for upload
-        shell: bash
-        run: |
-          cp "target/${{ matrix.target }}/release/strigil${{ matrix.suffix }}" "strigil-${{ matrix.target }}${{ matrix.suffix }}"
+      - name: Rename binary with its target
+        run: mv target/release/strigil${{ matrix.ext }} strigil-${{ matrix.target }}${{ matrix.ext }}
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: strigil-${{ matrix.target }}
-          path: strigil-${{ matrix.target }}${{ matrix.suffix }}
+          path: strigil-${{ matrix.target }}${{ matrix.ext }}
+          if-no-files-found: error
 
-  release:
-    name: Create release
+  publish:
+    name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v8
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Create release and upload assets
-        uses: softprops/action-gh-release@v3
-        with:
-          files: artifacts/**/*
-          generate_release_notes: true
+      - name: Create the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="continuous"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          # Re-running deletes the previous release for this tag (the tag itself is kept).
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            && gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes
+          gh release create "$tag" artifacts/*/strigil-* \
+            --repo "$GITHUB_REPOSITORY" --generate-notes

@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Terminal-aware highlighting: color turns on automatically when stdout is
   a terminal. `COLOR=always` forces it, `COLOR=never` disables it, and a
   present `NO_COLOR` variable disables it even when `COLOR=always` is set.
+- Tag-triggered `release.yml`: pushing a `v*` tag builds `--release`
+  binaries for Linux, Windows, and macOS and attaches them to the matching
+  GitHub Release (`workflow_dispatch` builds a "continuous" release).
+  `Cargo.lock` is now tracked so release builds are reproducible.
 
 ### Changed
 - Any number of `<file>` arguments are now accepted (previously at most
