@@ -42,7 +42,7 @@ jobs:
         run: mv target/release/strigil${{ matrix.ext }} strigil-${{ matrix.target }}${{ matrix.ext }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: strigil-${{ matrix.target }}
           path: strigil-${{ matrix.target }}${{ matrix.ext }}
