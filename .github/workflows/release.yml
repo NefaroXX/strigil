@@ -68,8 +68,36 @@ jobs:
           else
             tag="${GITHUB_REF_NAME}"
           fi
-          # Re-running deletes the previous release for this tag (the tag itself is kept).
-          gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
-            && gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes
-          gh release create "$tag" artifacts/*/strigil-* \
-            --repo "$GITHUB_REPOSITORY" --generate-notes
+
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+
+          # Delete existing release for this tag if present
+          release_id=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            "${api}/releases/tags/${tag}" | jq -r '.id // empty')
+          if [ -n "$release_id" ]; then
+            echo "Deleting existing release ${release_id} for ${tag}"
+            curl -s -X DELETE -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              "${api}/releases/${release_id}" > /dev/null
+          fi
+
+          # Create the release
+          curl -s -X POST -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "${api}/releases" -d "{
+              \"tag_name\": \"${tag}\",
+              \"name\": \"${tag}\",
+              \"generate_release_notes\": true
+            }" > /dev/null
+
+          # Upload each binary asset
+          release_id=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            "${api}/releases/tags/${tag}" | jq -r '.id')
+          for file in artifacts/*/strigil-*; do
+            name=$(basename "$file")
+            echo "Uploading ${name}"
+            curl -s -X POST -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Content-Type: application/octet-stream" \
+              "${api}/releases/${release_id}/assets?name=${name}" \
+              --data-binary "@${file}" > /dev/null
+          done
+          echo "Release ${tag} created with assets"
